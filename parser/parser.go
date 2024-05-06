@@ -19,6 +19,17 @@ const (
 	CALL        // myFunction(X)
 )
 
+var precedences = map[token.TokenType]int{
+	token.EQ:       EQUALS,
+	token.NOT_EQ:   EQUALS,
+	token.LT:       LESSGREATER,
+	token.GT:       LESSGREATER,
+	token.PLUS:     SUM,
+	token.MINUS:    SUM,
+	token.SLASH:    PRODUCT,
+	token.ASTERISK: PRODUCT,
+}
+
 type Parser struct {
 	lex    *lexer.Lexer
 	errors []string
@@ -47,6 +58,16 @@ func New(lex *lexer.Lexer) *Parser {
 	parser.registerPrefix(token.INT, parser.parseIntegerLiteral)
 	parser.registerPrefix(token.BANG, parser.parsePrefixExpression)
 	parser.registerPrefix(token.MINUS, parser.parsePrefixExpression)
+
+	parser.infixParseFns = make(map[token.TokenType]infixParseFn)
+	parser.registerInfix(token.PLUS, parser.parseInfixExpression)
+	parser.registerInfix(token.MINUS, parser.parseInfixExpression)
+	parser.registerInfix(token.SLASH, parser.parseInfixExpression)
+	parser.registerInfix(token.ASTERISK, parser.parseInfixExpression)
+	parser.registerInfix(token.EQ, parser.parseInfixExpression)
+	parser.registerInfix(token.NOT_EQ, parser.parseInfixExpression)
+	parser.registerInfix(token.LT, parser.parseInfixExpression)
+	parser.registerInfix(token.GT, parser.parseInfixExpression)
 
 	return parser
 }
@@ -132,6 +153,16 @@ func (parser *Parser) parseExpression(precedence int) ast.Expression {
 	}
 	leftExp := prefix()
 
+	for !parser.peekTokenIs(token.SEMICOLON) && precedence < parser.peekPrecedence() {
+		infix := parser.infixParseFns[parser.peekToken.Type]
+		if infix == nil {
+			return leftExp
+		}
+		parser.nextToken()
+
+		leftExp = infix(leftExp)
+	}
+
 	return leftExp
 }
 
@@ -143,6 +174,20 @@ func (parser *Parser) parsePrefixExpression() ast.Expression {
 
 	parser.nextToken()
 	expression.Right = parser.parseExpression(PREFIX)
+
+	return expression
+}
+
+func (parser *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
+	expression := &ast.InfixExpression{
+		Token:    parser.curToken,
+		Operator: parser.curToken.Literal,
+		Left:     left,
+	}
+
+	precedence := parser.curPrecedence()
+	parser.nextToken()
+	expression.Right = parser.parseExpression(precedence)
 
 	return expression
 }
@@ -202,6 +247,19 @@ func (parser *Parser) peekError(t token.TokenType) {
 }
 
 func (parser *Parser) noPrefixParseFnError(t token.TokenType) {
-	msg := fmt.Sprintf("no prefix parse function for %s fount", t)
+	msg := fmt.Sprintf("no prefix parse function for %s found", t)
 	parser.errors = append(parser.errors, msg)
+}
+
+func (parser *Parser) peekPrecedence() int {
+	if p, ok := precedences[parser.peekToken.Type]; ok {
+		return p
+	}
+	return LOWEST
+}
+func (parser *Parser) curPrecedence() int {
+	if p, ok := precedences[parser.curToken.Type]; ok {
+		return p
+	}
+	return LOWEST
 }
