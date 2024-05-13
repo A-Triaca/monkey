@@ -32,6 +32,12 @@ type Boolean struct {
 	Token token.Token
 	Value bool
 }
+
+type BlockStatement struct {
+	Token      token.Token // The { token
+	Statements []Statement
+}
+
 type PrefixExpression struct {
 	Token    token.Token
 	Operator string
@@ -43,6 +49,12 @@ type InfixExpression struct {
 	Left     Expression
 	Operator string
 	Right    Expression
+}
+type IfExpression struct {
+	Token       token.Token // The "if" token
+	Condition   Expression
+	Consequence *BlockStatement
+	Alternative *BlockStatement
 }
 
 func (p *Program) TokenLiteral() string {
@@ -132,6 +144,10 @@ func (il *IntegerLiteral) expressionNode()      {}
 func (il *IntegerLiteral) TokenLiteral() string { return il.Token.Literal }
 func (il *IntegerLiteral) String() string       { return il.Token.Literal }
 
+func (b *Boolean) expressionNode()      {}
+func (b *Boolean) TokenLiteral() string { return b.Token.Literal }
+func (b *Boolean) String() string       { return b.Token.Literal }
+
 func (pe *PrefixExpression) expressionNode()      {}
 func (pe *PrefixExpression) TokenLiteral() string { return pe.Token.Literal }
 func (pe *PrefixExpression) String() string {
@@ -159,6 +175,32 @@ func (ie *InfixExpression) String() string {
 	return out.String()
 }
 
-func (b *Boolean) expressionNode()      {}
-func (b *Boolean) TokenLiteral() string { return b.Token.Literal }
-func (b *Boolean) String() string       { return b.Token.Literal }
+func (ie *IfExpression) expressionNode()      {}
+func (ie *IfExpression) TokenLiteral() string { return ie.Token.Literal }
+func (ie *IfExpression) String() string {
+	var out bytes.Buffer
+
+	out.WriteString("if")
+	out.WriteString(ie.Condition.String())
+	out.WriteString(" ")
+	out.WriteString(ie.Consequence.String())
+
+	if ie.Alternative != nil {
+		out.WriteString("else ")
+		out.WriteString(ie.Alternative.String())
+	}
+
+	return out.String()
+}
+
+func (bs *BlockStatement) statementNode()       {}
+func (bs *BlockStatement) TokenLiteral() string { return bs.Token.Literal }
+func (bs *BlockStatement) String() string {
+	var out bytes.Buffer
+
+	for _, s := range bs.Statements {
+		out.WriteString(s.String())
+	}
+
+	return out.String()
+}
